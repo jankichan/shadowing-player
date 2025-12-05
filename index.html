@@ -3,19 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>影子播放器 V11.1 (录音导航版)</title>
+    <title>影子播放器 V10.2 (交互修复版)</title>
     <style>
-        /* === 全局基础 === */
-        :root { --primary: #2c3e50; --accent: #3498db; --bg: #f8f9fa; --active-bg: #e3f2fd; --highlight: #f1c40f; --record: #e74c3c; }
+        /* === 全局设置 === */
+        :root { --primary: #2c3e50; --accent: #3498db; --bg: #f8f9fa; --active-bg: #e3f2fd; --highlight: #f1c40f; }
         body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+        /* 强制允许选择，这对手机端至关重要 */
         body, #transcript-list, .line-content, .vocab-item { -webkit-user-select: text !important; user-select: text !important; }
         .line-time, button, .tab, header { -webkit-user-select: none !important; user-select: none !important; }
 
-        /* === 顶部 === */
-        header { padding: 8px; background: #fff; border-bottom: 1px solid #ddd; display: flex; overflow-x: auto; gap: 8px; align-items: center; white-space: nowrap; flex-shrink: 0; -webkit-overflow-scrolling: touch; }
-        .group { display: flex; align-items: center; gap: 4px; background: #f1f3f5; padding: 4px 8px; border-radius: 6px; border: 1px solid #e9ecef; }
-        input[type="text"] { border: 1px solid #ccc; width: 80px; font-size: 12px; padding: 4px; }
-        input[type="file"] { width: 140px; font-size: 11px; }
+        /* === 顶部文件栏 === */
+        header { padding: 8px 15px; background: #fff; border-bottom: 1px solid #ddd; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); z-index: 10; font-size: 12px; }
+        h3 { margin: 0; margin-right: 5px; color: var(--primary); font-size: 15px; }
+        
+        .group { display: flex; align-items: center; gap: 3px; background: #f1f3f5; padding: 2px 6px; border-radius: 4px; border: 1px solid #e9ecef; }
+        input[type="text"] { padding: 2px; border: 1px solid #ccc; width: 90px; font-size: 11px; }
+        input[type="file"] { font-size: 11px; width: 140px; }
+        button.icon-btn { padding: 2px 6px; background: none; border: none; cursor: pointer; font-size: 12px; color: #888; }
+        button.icon-btn:hover { color: #e74c3c; }
+        button.sm-btn { padding: 2px 6px; background: var(--accent); color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; }
         
         /* === 主体 === */
         main { display: flex; flex-direction: column; flex: 1; overflow: hidden; width: 100%; }
@@ -23,9 +29,13 @@
         /* 视频区 */
         #video-section { flex: none; height: 35vh; width: 100%; background: #000; position: relative; display: flex; align-items: center; justify-content: center; }
         video { width: 100%; height: 100%; object-fit: contain; }
+        
+        /* 播放引导与状态 */
         #play-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 5; cursor: pointer; display: none; }
         .big-play-btn { font-size: 50px; color: white; opacity: 0.8; }
         #video-status { position: absolute; color: #fff; font-size: 14px; background: rgba(0,0,0,0.6); padding: 8px 12px; border-radius: 4px; pointer-events: none; display: none; z-index: 10; }
+
+        /* 字幕覆盖 */
         #video-overlay { position: absolute; bottom: 10px; width: 95%; text-align: center; pointer-events: none; display: none; text-shadow: 0 1px 3px rgba(0,0,0,0.9); z-index: 2; }
         .overlay-source { color: #fff; font-size: 18px; font-weight: bold; margin-bottom: 2px; line-height: 1.2; }
         .overlay-target { color: #ffd700; font-size: 13px; }
@@ -37,17 +47,16 @@
         /* 面板区 */
         #right-panel { flex: 1; background: #fff; border-top: 1px solid #ccc; display: flex; flex-direction: column; min-height: 0; position: relative; }
         
-        .tabs { display: flex; border-bottom: 1px solid #ddd; background: #f8f9fa; flex-shrink: 0; height: 40px; }
-        .tab { flex: 1; line-height: 40px; text-align: center; font-size: 14px; color: #666; font-weight: 500; border-bottom: 2px solid transparent; cursor: pointer; }
-        .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: #fff; color: var(--accent); }
+        .tabs { display: flex; border-bottom: 1px solid #ddd; background: #f8f9fa; flex-shrink: 0; height: 36px; }
+        .tab { flex: 1; line-height: 36px; text-align: center; font-size: 13px; color: #666; font-weight: 500; border-bottom: 2px solid transparent; }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: #fff; }
         
         .panel-content { flex: 1; overflow: hidden; display: none; flex-direction: column; height: 100%; }
         .panel-content.active { display: flex; }
 
-        /* 控制栏 */
         #controls-bar { padding: 6px; background: #fff; border-bottom: 1px solid #eee; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
         .ctrl-row { display: flex; gap: 6px; }
-        button.act-btn { flex: 1; padding: 8px 0; border: 1px solid #ced4da; background: #fff; border-radius: 4px; font-size: 13px; touch-action: manipulation; display: flex; align-items: center; justify-content: center; }
+        button.act-btn { flex: 1; padding: 8px 0; border: 1px solid #ced4da; background: #fff; border-radius: 4px; font-size: 13px; touch-action: manipulation; }
         button.act-btn:active { background: #e9ecef; }
         button.act-btn.active { background: #e3f2fd; color: var(--accent); border-color: var(--accent); }
         button.act-btn.loop-on { background: #ff9800; color: white; border-color: #f57c00; }
@@ -63,28 +72,19 @@
         #vocab-panel { padding: 10px; overflow-y: auto; }
         .vocab-item { border: 1px solid #eee; border-radius: 8px; padding: 10px; margin-bottom: 10px; background: #fff; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
         
-        /* === 录音面板样式 === */
-        #record-panel { padding: 15px; background: #fff; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-        .current-sentence-card { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; text-align: center; display: flex; flex-direction: column; gap: 12px; }
-        .target-text { font-size: 16px; font-weight: bold; color: #2c3e50; min-height: 20px; }
-        .record-controls { display: flex; gap: 20px; justify-content: center; align-items: center; }
-        .circle-btn { width: 64px; height: 64px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; font-size: 26px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.1s; }
-        .circle-btn:active { transform: scale(0.95); }
-        .btn-play-origin { background: var(--accent); color: white; }
-        .btn-record { background: white; border: 2px solid var(--record); color: var(--record); }
-        .btn-record.recording { background: var(--record); color: white; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(231, 76, 60, 0); } 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); } }
-        
-        .recordings-list { flex: 1; display: flex; flex-direction: column; gap: 10px; }
-        .recording-item { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid #eee; padding: 10px; border-radius: 8px; }
-        .rec-name { font-size: 12px; color: #888; width: 40px; }
-        audio { flex: 1; height: 32px; }
-        .btn-del-rec { background: none; border: none; color: #ccc; font-size: 18px; padding: 5px; cursor: pointer; }
-        .btn-del-rec:hover { color: #e74c3c; }
+        /* === 悬浮添加按钮 (FAB) === */
+        #fab-add {
+            position: absolute; bottom: 10px; right: 10px;
+            width: 30px; height:30px; border-radius: 50%;
+            background: var(--accent); color: white;
+            font-size: 30px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 80; cursor: pointer; transition: transform 0.1s;
+            touch-action: manipulation;
+        }
+        #fab-add:active { transform: scale(0.9); background: #2980b9; }
 
-        /* FAB & Modal */
-        #fab-add { position: absolute; bottom: 20px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: white; font-size: 30px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 80; cursor: pointer; transition: transform 0.1s; }
-        #fab-add:active { transform: scale(0.9); }
+        /* 弹窗 */
         .overlay-mask { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99; display: none; }
         #add-word-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; width: 85%; max-width: 320px; padding: 15px; border-radius: 12px; z-index: 100; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
         .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; margin-bottom: 10px; }
@@ -102,28 +102,11 @@
 <body>
 
 <header>
-    <h4>影子 v11.1</h4>
-    <div class="group">
-        <span class="group-label">🌐</span>
-        <input type="text" id="urlInput" placeholder="MP4 链接">
-        <button class="sm-btn" onclick="loadUrl()">Go</button>
-        <button class="icon-btn" onclick="clearInput('url')">🗑️</button>
-    </div>
-    <div class="group">
-        <span class="group-label">📂</span>
-        <input type="file" id="fileVideo" accept="video/*" onchange="loadLocalVideo(this)">
-        <button class="icon-btn" onclick="clearInput('video')">🗑️</button>
-    </div>
-    <div class="group">
-        <span class="group-label">📝 学习语:</span>
-        <input type="file" id="fileSub1" accept=".srt" onchange="loadSub(this, 'source')">
-        <button class="icon-btn" onclick="clearInput('sub1')">🗑️</button>
-    </div>
-    <div class="group">
-        <span class="group-label">🇨🇳 母语:</span>
-        <input type="file" id="fileSub2" accept=".srt" onchange="loadSub(this, 'target')">
-        <button class="icon-btn" onclick="clearInput('sub2')">🗑️</button>
-    </div>
+    <h3>影子 V9.0</h3>
+    <div class="group"><span class="group-label">🌐</span><input type="text" id="urlInput" placeholder="MP4 链接"><button class="sm-btn" onclick="loadUrl()">Go</button><button class="icon-btn" onclick="clearInput('url')">🗑️</button></div>
+    <div class="group"><span class="group-label">📂</span><input type="file" id="fileVideo" accept="video/*" onchange="loadLocalVideo(this)"><button class="icon-btn" onclick="clearInput('video')">🗑️</button></div>
+    <div class="group"><span class="group-label">📝 学习语:</span><input type="file" id="fileSub1" accept=".srt" onchange="loadSub(this, 'source')"><button class="icon-btn" onclick="clearInput('sub1')">🗑️</button></div>
+    <div class="group"><span class="group-label">🇨🇳 母语:</span><input type="file" id="fileSub2" accept=".srt" onchange="loadSub(this, 'target')"><button class="icon-btn" onclick="clearInput('sub2')">🗑️</button></div>
 </header>
 
 <main>
@@ -138,23 +121,14 @@
     <div id="right-panel">
         <div class="tabs">
             <div class="tab active" id="tab-transcript" onclick="switchTab('transcript')">字幕列表</div>
-            <div class="tab" id="tab-record" onclick="switchTab('record')">🎙️ 录音</div>
             <div class="tab" id="tab-vocab" onclick="switchTab('vocab')">生词本 (<span id="vocab-count">0</span>)</div>
         </div>
 
-        <!-- 面板1: 字幕 -->
         <div id="panel-transcript" class="panel-content active">
             <div id="controls-bar">
                 <div class="ctrl-row">
                     <select id="displayMode" onchange="handleDisplayChange()" style="flex:1.5"><option value="both">双语</option><option value="source">仅学习语</option><option value="target">仅母语</option></select>
-                    <select id="speedSelect" onchange="changeSpeed()" style="flex:1">
-                        <option value="0.5">0.5x</option>
-                        <option value="0.8">0.8x</option>
-                        <option value="1.0" selected>1.0x</option>
-                        <option value="1.25">1.25x</option>
-						<option value="1.5">1.5x</option>
-						<option value="2.0">2.0x</option>
-                    </select>
+                    <select id="speedSelect" onchange="changeSpeed()" style="flex:1"><option value="0.8">0.8x</option><option value="1.0" selected>1.0x</option><option value="1.25">1.25x</option></select>
                 </div>
                 <div class="ctrl-row">
                     <button class="act-btn" onclick="setLoopA()" id="btnLoopA">A点</button>
@@ -162,42 +136,21 @@
                     <button class="act-btn" id="loopBtn" onclick="toggleSingleLoop()">单句</button>
                 </div>
                 <div class="ctrl-row">
-                    <button class="act-btn" onclick="nav(-1)">⬆ 上句</button>
+                    <button class="act-btn" onclick="nav(-1)">⬆ 上一句</button>
                     <button class="act-btn" onclick="clearLoop()" id="btnClearLoop" style="display:none; background:#ffebee; color:#c62828;">取消循环</button>
-                    <button class="act-btn" onclick="nav(1)">⬇ 下句</button>
+                    <button class="act-btn" onclick="nav(1)">⬇ 下一句</button>
                 </div>
             </div>
             <div id="transcript-list">
-                <div style="padding:40px 20px; text-align:center; color:#999; font-size:13px;">请加载文件<br><span style="font-size:12px; color:#ccc;">提示: 划选单词后点击右下角➕号添加</span></div>
+                <div style="padding:40px 20px; text-align:center; color:#999; font-size:13px;">
+                    请加载视频和字幕<br>
+                    <span style="font-size:12px; color:#ccc;">提示: 划选单词后点击右下角➕号添加</span>
+                </div>
             </div>
+            <!-- 悬浮添加按钮 (FAB) -->
             <button id="fab-add" onclick="manualAddWord()">➕</button>
         </div>
 
-        <!-- 面板2: 录音 -->
-        <div id="panel-record" class="panel-content">
-            <div id="record-panel">
-                <div class="current-sentence-card">
-                    <div class="target-text" id="rec-target-text">请先在字幕列表选择一句话</div>
-                    
-                    <div class="record-controls">
-                        <button class="circle-btn btn-play-origin" onclick="playCurrentSentence()" title="听原音">🔊</button>
-                        <button class="circle-btn btn-record" id="btn-record-toggle" onclick="toggleRecording()" title="录音">🎙️</button>
-                    </div>
-
-                    <!-- 导航控制 (新增) -->
-                    <div class="ctrl-row" style="width:100%;">
-                        <button class="act-btn" onclick="nav(-1)">⬆ 上一句</button>
-                        <button class="act-btn" onclick="nav(1)">⬇ 下一句</button>
-                    </div>
-                </div>
-                <div style="font-weight:bold; color:#555; margin-top:5px;">我的录音:</div>
-                <div class="recordings-list" id="recordings-list">
-                    <div style="text-align:center; color:#ccc; font-size:13px; margin-top:20px;">暂无录音，试着录一句吧！</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 面板3: 生词本 -->
         <div id="panel-vocab" class="panel-content">
             <div id="vocab-panel">
                 <div style="display:flex; gap:8px; margin-bottom:10px;">
@@ -224,114 +177,67 @@
 </div>
 
 <script>
-    const state={subs:{source:[],target:[]},activeIndex:-1,loopMode:'none',loopA:null,loopB:null,overlayOn:false,manualSeek:false,vocab:[],
-        mediaRecorder: null, audioChunks: [], isRecording: false, recordings: []
-    };
-    let lastSelectedText = "";
+    const state={subs:{source:[],target:[]},activeIndex:-1,loopMode:'none',loopA:null,loopB:null,overlayOn:false,manualSeek:false,vocab:[]};
+    
+    // === 核心修复：选区记忆机制 ===
+    let lastSelectedText = ""; // 记住用户最后一次选中的文字
 
     function init(){
         try{const s=localStorage.getItem('shadow_vocab');if(s)state.vocab=JSON.parse(s);}catch(e){}
         updateVocabUI();
-        document.addEventListener('selectionchange', () => { const sel = window.getSelection().toString().trim(); if(sel) lastSelectedText = sel; });
-        document.addEventListener('copy', () => { setTimeout(() => { const text = window.getSelection().toString().trim() || lastSelectedText; if(text) popupVocabModal(text); }, 100); });
+        
+        // 1. 监听选区变化，时刻记录内容
+        document.addEventListener('selectionchange', () => {
+            const sel = window.getSelection().toString().trim();
+            if(sel) lastSelectedText = sel; // 只要有内容就更新记忆
+        });
+
+        // 2. 保留复制监听作为快捷方式
+        document.addEventListener('copy', () => {
+            // 稍微延时，确保选区状态
+            setTimeout(() => {
+                const text = window.getSelection().toString().trim() || lastSelectedText;
+                if(text) popupVocabModal(text);
+            }, 100);
+        });
+
         window.addEventListener('beforeunload',(e)=>{e.preventDefault();e.returnValue='';});
     }
     
-    // === 录音核心 ===
-    function playCurrentSentence() {
-        if(state.activeIndex === -1 || !state.subs.source[state.activeIndex]) { alert("请先选择一句话"); return; }
-        const item = state.subs.source[state.activeIndex];
-        video.currentTime = item.start; video.play();
-        const stopTime = item.end;
-        const checkTime = () => { if(video.currentTime >= stopTime) { video.pause(); video.removeEventListener('timeupdate', checkTime); } };
-        video.addEventListener('timeupdate', checkTime);
-    }
-
-    async function toggleRecording() {
-        if (!state.isRecording) {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert("麦克风权限受限 (请使用 HTTPS 或 localhost)"); return; }
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                state.mediaRecorder = new MediaRecorder(stream);
-                state.audioChunks = [];
-                state.mediaRecorder.ondataavailable = event => state.audioChunks.push(event.data);
-                state.mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    addRecordingToList(audioUrl);
-                };
-                state.mediaRecorder.start();
-                state.isRecording = true;
-                updateRecordBtnUI();
-            } catch (err) { alert("麦克风启动失败: " + err.message); }
-        } else {
-            state.mediaRecorder.stop();
-            state.isRecording = false;
-            updateRecordBtnUI();
+    // === 手动触发添加 ===
+    function manualAddWord() {
+        // 优先取当前选区，如果空则取记忆的选区
+        const text = window.getSelection().toString().trim() || lastSelectedText;
+        if(!text) {
+            alert("请先划选单词！");
+            return;
         }
+        popupVocabModal(text);
     }
 
-    function updateRecordBtnUI() {
-        const btn = document.getElementById('btn-record-toggle');
-        if(state.isRecording) { btn.classList.add('recording'); btn.innerText = "⏹"; } 
-        else { btn.classList.remove('recording'); btn.innerText = "🎙️"; }
-    }
-
-    function addRecordingToList(url) {
-        const list = document.getElementById('recordings-list');
-        if(state.recordings.length === 0) list.innerHTML = '';
-        state.recordings.push(url);
-        const index = state.recordings.length;
-        const item = document.createElement('div');
-        item.className = 'recording-item';
-        item.innerHTML = `<span class="rec-name">#${index}</span><audio controls src="${url}"></audio><button class="btn-del-rec" onclick="deleteRecording(this, '${url}')">×</button>`;
-        list.insertBefore(item, list.firstChild);
-    }
-
-    function deleteRecording(btn, url) { btn.parentElement.remove(); URL.revokeObjectURL(url); }
-
-    // === UI 切换 ===
-    function switchTab(t){
-        document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-        document.querySelectorAll('.panel-content').forEach(x=>x.classList.remove('active'));
-        document.getElementById('tab-'+t).classList.add('active');
-        document.getElementById('panel-'+t).classList.add('active');
-        if(t === 'record') updateRecordText();
-    }
-    
-    function updateRecordText() {
-        const txtDiv = document.getElementById('rec-target-text');
-        if(state.activeIndex !== -1 && state.subs.source[state.activeIndex]) {
-            txtDiv.innerText = state.subs.source[state.activeIndex].text;
-        } else {
-            txtDiv.innerText = "请先在字幕列表选择一句话";
-        }
-    }
-
-    // === 基础播放器 ===
     const video=document.getElementById('mainVideo');
     const statusDiv=document.getElementById('video-status');
     const playOverlay=document.getElementById('play-overlay');
     const listDiv=document.getElementById('transcript-list');
 
-    video.onerror=function(){showStatus("❌ 无法播放: 格式不支持",5000);playOverlay.style.display='none';};
-    video.onloadedmetadata=function(){showStatus("✅ 就绪",3000);playOverlay.style.display='flex';};
-    function showStatus(t,d){statusDiv.innerText=t;statusDiv.style.display='block';if(d)setTimeout(()=>statusDiv.style.display='none',d);}
-    function triggerPlay(){video.play().then(()=>{playOverlay.style.display='none';}).catch(e=>{showStatus("播放失败:"+e.message,3000);});}
+    video.onerror = function() { showStatus("❌ 无法播放: 格式不支持或解码错误", 5000); playOverlay.style.display='none'; };
+    video.onloadedmetadata = function() { showStatus("✅ 就绪，请点击播放", 3000); playOverlay.style.display='flex'; };
+    function showStatus(t,d){ statusDiv.innerText=t; statusDiv.style.display='block'; if(d)setTimeout(()=>statusDiv.style.display='none',d); }
+    function triggerPlay(){ video.play().then(()=>{playOverlay.style.display='none';}).catch(e=>{showStatus("播放失败:"+e.message,3000);}); }
 
     function loadUrl(){const v=document.getElementById('urlInput').value;if(v){video.src=v;}}
     function loadLocalVideo(i){const f=i.files[0];if(f)video.src=URL.createObjectURL(f);}
     function loadSub(i,t){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=(e)=>{state.subs[t]=parseSRT(e.target.result);renderList();};r.readAsText(f);}
     
+    function switchTab(t){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel-content').forEach(x=>x.classList.remove('active'));if(t==='transcript'){document.getElementById('tab-transcript').classList.add('active');document.getElementById('panel-transcript').classList.add('active');}else{document.getElementById('tab-vocab').classList.add('active');document.getElementById('panel-vocab').classList.add('active');}}
     function handleDisplayChange(){renderList();if(state.activeIndex!==-1)updateOverlay(state.activeIndex);}
+
     function parseSRT(d){const i=[];const r=/(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})\n([\s\S]*?)(?=\n\n|\n$|$)/g;d=d.replace(/\r\n/g,'\n');let m;while((m=r.exec(d))!==null){i.push({start:timeToSec(m[1]),end:timeToSec(m[2]),text:m[3].trim()});}return i;}
     function timeToSec(s){const p=s.split(':'),sec=p[2].split(',');return parseInt(p[0])*3600+parseInt(p[1])*60+parseInt(sec[0])+parseFloat(sec[1])/1000;}
     function fmtTime(s){const m=Math.floor(s/60).toString().padStart(2,'0'),sec=Math.floor(s%60).toString().padStart(2,'0');return `${m}:${sec}`;}
-    function renderList(){const s=state.subs.source,t=state.subs.target,m=document.getElementById('displayMode').value;listDiv.innerHTML='';if(!s||!s.length){listDiv.innerHTML='<div style="padding:40px 20px; text-align:center; color:#999; font-size:13px;">请先加载字幕</div>';return;}s.forEach((it,i)=>{const mid=(it.start+it.end)/2,tt=t.find(x=>mid>=x.start&&mid<=x.end),txt=tt?tt.text:'',div=document.createElement('div');div.className='line';div.id=`line-${i}`;div.onclick=(e)=>{if(!window.getSelection().toString())jumpTo(i);};let h='';if(m==='source')h=`<div class="line-content">${it.text}</div>`;else if(m==='target')h=`<div class="line-content" style="color:#555">${txt||'(无)'}</div>`;else h=`<div class="line-content">${it.text}<div class="text-target">${txt}</div></div>`;div.innerHTML=`<span class="line-time">${fmtTime(it.start)}</span>${h}`;listDiv.appendChild(div);});}
+    function renderList(){const s=state.subs.source,t=state.subs.target,m=document.getElementById('displayMode').value;listDiv.innerHTML='';if(!s||!s.length){listDiv.innerHTML='<div style="padding:40px 20px; text-align:center; color:#999; font-size:13px;">请加载字幕文件<br><br>提示: 划选单词后点击右下角➕号添加</div>';return;}s.forEach((it,i)=>{const mid=(it.start+it.end)/2,tt=t.find(x=>mid>=x.start&&mid<=x.end),txt=tt?tt.text:'',div=document.createElement('div');div.className='line';div.id=`line-${i}`;div.onclick=(e)=>{if(!window.getSelection().toString())jumpTo(i);};let h='';if(m==='source')h=`<div class="line-content">${it.text}</div>`;else if(m==='target')h=`<div class="line-content" style="color:#555">${txt||'(无)'}</div>`;else h=`<div class="line-content">${it.text}<div class="text-target">${txt}</div></div>`;div.innerHTML=`<span class="line-time">${fmtTime(it.start)}</span>${h}`;listDiv.appendChild(div);});}
 
-    function jumpTo(i){if(!state.subs.source[i])return;state.activeIndex=i;state.manualSeek=true;video.currentTime=state.subs.source[i].start+0.01;video.play();highlightLine(i);updateOverlay(i);playOverlay.style.display='none'; setTimeout(()=>state.manualSeek=false,600); 
-        updateRecordText(); // 同步更新录音文字
-    }
+    function jumpTo(i){if(!state.subs.source[i])return;state.activeIndex=i;state.manualSeek=true;video.currentTime=state.subs.source[i].start+0.01;video.play();highlightLine(i);updateOverlay(i);playOverlay.style.display='none'; setTimeout(()=>state.manualSeek=false,600);}
     function highlightLine(i){document.querySelectorAll('.line.active').forEach(x=>x.classList.remove('active'));const e=document.getElementById(`line-${i}`);if(e){e.classList.add('active');e.scrollIntoView({behavior:"smooth",block:"center"});}}
     function findIdx(){const t=video.currentTime;return state.subs.source.findIndex(i=>t>=i.start&&t<i.end);}
     function setLoopA(){const i=findIdx();state.loopA=(i!==-1)?state.subs.source[i].start:video.currentTime;state.loopMode='ab';updateLoopUI();}
@@ -340,7 +246,6 @@
     function toggleSingleLoop(){state.loopMode=state.loopMode==='single'?'none':'single';if(state.loopMode==='single'&&state.activeIndex===-1)syncIdx();updateLoopUI();}
     function updateLoopUI(){const a=document.getElementById('btnLoopA'),b=document.getElementById('btnLoopB'),c=document.getElementById('btnClearLoop'),s=document.getElementById('loopBtn');a.className='act-btn';b.className='act-btn';s.className='act-btn';c.style.display='none';if(state.loopMode==='ab'){if(state.loopA!==null)a.classList.add('loop-on');if(state.loopB!==null)b.classList.add('loop-on');c.style.display='inline-flex';}else if(state.loopMode==='single')s.classList.add('active');}
 
-    function manualAddWord() { const text = window.getSelection().toString().trim() || lastSelectedText; if(!text) { alert("请先划选单词！"); return; } popupVocabModal(text); }
     function popupVocabModal(t){let c="";if(state.activeIndex!==-1){const s=state.subs.source,p=s[state.activeIndex-1]?.text||"",cr=s[state.activeIndex].text,n=s[state.activeIndex+1]?.text||"";c=`${p} ${cr} ${n}`.trim();}document.getElementById('vocab-word').value=t;document.getElementById('vocab-def').value="";document.getElementById('vocab-eg').value=c;document.getElementById('modalMask').style.display='block';document.getElementById('add-word-modal').style.display='block';}
     function closeModal(){document.getElementById('modalMask').style.display='none';document.getElementById('add-word-modal').style.display='none';}
     function saveVocab(){const w=document.getElementById('vocab-word').value,d=document.getElementById('vocab-def').value,e=document.getElementById('vocab-eg').value;if(!w)return;state.vocab.unshift({word:w,def:d,eg:e,date:new Date().toLocaleDateString()});localStorage.setItem('shadow_vocab',JSON.stringify(state.vocab));updateVocabUI();closeModal();if(state.overlayOn)updateOverlay(state.activeIndex);}
@@ -356,6 +261,7 @@
     function syncIdx(){const t=video.currentTime,i=state.subs.source.findIndex(s=>t>=s.start&&t<=s.end);if(i!==-1)state.activeIndex=i;}
     function changeSpeed(){video.playbackRate=parseFloat(document.getElementById('speedSelect').value);}
     function nav(d){const n=state.activeIndex+d;if(n>=0&&n<state.subs.source.length)jumpTo(n);}
+    
     function exportFile(type) {
         if(!state.vocab.length){ alert("空"); return; }
         let c="",mime="",ext="";

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>影子播放器 V10.1 (手机修复版)</title>
+    <style>
+        /* === 全局设置 === */
+        :root { --primary: #2c3e50; --accent: #3498db; --bg: #f8f9fa; --active-bg: #e3f2fd; --highlight: #f1c40f; }
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+        body, #transcript-list, .line-content { -webkit-user-select: text !important; user-select: text !important; }
+        
+        /* === 顶部文件栏 (自动折叠) === */
+        header { padding: 8px; background: #fff; border-bottom: 1px solid #ddd; display: flex; overflow-x: auto; gap: 8px; align-items: center; white-space: nowrap; flex-shrink: 0; -webkit-overflow-scrolling: touch; }
+        .group { display: flex; align-items: center; gap: 4px; background: #f1f3f5; padding: 4px 8px; border-radius: 6px; border: 1px solid #e9ecef; }
+        input[type="text"] { border: 1px solid #ccc; width: 80px; font-size: 12px; padding: 4px; }
+        input[type="file"] { width: 140px; font-size: 11px; }
+        
+        /* === 主体 === */
+        main { display: flex; flex-direction: column; flex: 1; overflow: hidden; width: 100%; }
+        
+        /* 视频区 */
+        #video-section { flex: none; height: 35vh; width: 100%; background: #000; position: relative; display: flex; align-items: center; justify-content: center; }
+        video { width: 100%; height: 100%; object-fit: contain; }
+        
+        /* 状态提示层 */
+        #video-status { position: absolute; color: #fff; font-size: 14px; background: rgba(0,0,0,0.6); padding: 8px 12px; border-radius: 4px; pointer-events: none; display: none; z-index: 10; }
+        
+        /* 引导播放按钮 (解决手机禁止自动播放) */
+        #play-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 5; cursor: pointer; display: none; }
+        .big-play-btn { font-size: 50px; color: white; opacity: 0.8; }
+
+        /* 字幕覆盖 */
+        #video-overlay { position: absolute; bottom: 10px; width: 95%; text-align: center; pointer-events: none; display: none; text-shadow: 0 1px 3px rgba(0,0,0,0.9); z-index: 2; }
+        .overlay-source { color: #fff; font-size: 18px; font-weight: bold; margin-bottom: 2px; line-height: 1.2; }
+        .overlay-target { color: #ffd700; font-size: 13px; }
+        .vocab-highlight { color: #ffeb3b !important; text-decoration: underline; }
+        
+        #overlay-toggle { position: absolute; top: 10px; right: 10px; z-index: 20; }
+        .toggle-btn { background: rgba(0,0,0,0.5); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 4px 10px; border-radius: 15px; font-size: 12px; }
+        .toggle-btn.active { background: var(--accent); border-color: var(--accent); }
+
+        /* 面板区 */
+        #right-panel { flex: 1; background: #fff; border-top: 1px solid #ccc; display: flex; flex-direction: column; min-height: 0; }
+        
+        .tabs { display: flex; border-bottom: 1px solid #ddd; background: #f8f9fa; flex-shrink: 0; height: 36px; }
+        .tab { flex: 1; line-height: 36px; text-align: center; font-size: 13px; color: #666; font-weight: 500; border-bottom: 2px solid transparent; }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: #fff; }
+        
+        .panel-content { flex: 1; overflow: hidden; display: none; flex-direction: column; height: 100%; }
+        .panel-content.active { display: flex; }
+
+        #controls-bar { padding: 6px; background: #fff; border-bottom: 1px solid #eee; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+        .ctrl-row { display: flex; gap: 6px; }
+        button.act-btn { flex: 1; padding: 8px 0; border: 1px solid #ced4da; background: #fff; border-radius: 4px; font-size: 13px; touch-action: manipulation; }
+        button.act-btn:active { background: #e9ecef; }
+        button.act-btn.active { background: #e3f2fd; color: var(--accent); border-color: var(--accent); }
+        button.act-btn.loop-on { background: #ff9800; color: white; border-color: #f57c00; }
+        select { flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px; background: white; }
+
+        #transcript-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .line { padding: 12px 10px; border-bottom: 1px solid #f1f1f1; display: flex; gap: 8px; }
+        .line.active { background: var(--active-bg); border-left: 4px solid var(--accent); }
+        .line-time { color: #aaa; font-size: 12px; font-family: monospace; margin-top: 2px; width: 38px; flex-shrink: 0; }
+        .line-content { flex: 1; font-size: 15px; line-height: 1.4; }
+        .text-target { font-size: 13px; color: #7f8c8d; margin-top: 4px; }
+
+        #vocab-panel { padding: 10px; overflow-y: auto; }
+        .vocab-item { border: 1px solid #eee; border-radius: 8px; padding: 10px; margin-bottom: 10px; background: #fff; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        
+        /* 弹窗 */
+        .overlay-mask { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99; display: none; }
+        #add-word-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; width: 85%; max-width: 320px; padding: 15px; border-radius: 12px; z-index: 100; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; margin-bottom: 10px; }
+        
+        /* 电脑端适配 */
+        @media (min-width: 769px) {
+            main { flex-direction: row; }
+            #video-section { height: 100%; flex: 1.6; }
+            #right-panel { border-left: 1px solid #ccc; border-top: none; }
+            #video-overlay { bottom: 60px; }
+            .overlay-source { font-size: 24px; }
+            .overlay-target { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="group"><span>🎬</span><input type="file" id="fileVideo" accept="video/*" onchange="loadLocalVideo(this)"></div>
+    <div class="group"><span>📝学</span><input type="file" id="fileSub1" accept=".srt" onchange="loadSub(this, 'source')"></div>
+    <div class="group"><span>🇨🇳母</span><input type="file" id="fileSub2" accept=".srt" onchange="loadSub(this, 'target')"></div>
+</header>
+
+<main>
+    <div id="video-section">
+        <video id="mainVideo" controls playsinline webkit-playsinline>
+            <p style="color:white">您的浏览器不支持 Video</p>
+        </video>
+        
+        <!-- 引导播放遮罩 -->
+        <div id="play-overlay" onclick="triggerPlay()">
+            <div class="big-play-btn">▶️ 点击播放</div>
+        </div>
+        
+        <!-- 状态提示 -->
+        <div id="video-status">准备就绪</div>
+
+        <div id="video-overlay"><div class="overlay-source" id="overlay-s"></div><div class="overlay-target" id="overlay-t"></div></div>
+        <div id="overlay-toggle"><button class="toggle-btn" id="overlayBtn" onclick="toggleOverlay()">字幕:关</button></div>
+    </div>
+
+    <div id="right-panel">
+        <div class="tabs">
+            <div class="tab active" id="tab-transcript" onclick="switchTab('transcript')">字幕列表</div>
+            <div class="tab" id="tab-vocab" onclick="switchTab('vocab')">生词本 (<span id="vocab-count">0</span>)</div>
+        </div>
+
+        <div id="panel-transcript" class="panel-content active">
+            <div id="controls-bar">
+                <div class="ctrl-row">
+                    <select id="displayMode" onchange="handleDisplayChange()" style="flex:1.5"><option value="both">双语</option><option value="source">仅学习语</option><option value="target">仅母语</option></select>
+                    <select id="speedSelect" onchange="changeSpeed()" style="flex:1"><option value="0.8">0.8x</option><option value="1.0" selected>1.0x</option><option value="1.25">1.25x</option></select>
+                </div>
+                <div class="ctrl-row">
+                    <button class="act-btn" onclick="setLoopA()" id="btnLoopA">A点</button>
+                    <button class="act-btn" onclick="setLoopB()" id="btnLoopB">B点</button>
+                    <button class="act-btn" id="loopBtn" onclick="toggleSingleLoop()">单句</button>
+                </div>
+                <div class="ctrl-row">
+                    <button class="act-btn" onclick="nav(-1)">⬆ 上一句</button>
+                    <button class="act-btn" onclick="clearLoop()" id="btnClearLoop" style="display:none; background:#ffebee; color:#c62828;">取消循环</button>
+                    <button class="act-btn" onclick="nav(1)">⬇ 下一句</button>
+                </div>
+            </div>
+            <div id="transcript-list"><div style="padding:40px 20px; text-align:center; color:#999; font-size:13px;">请加载视频和字幕文件<br><br>提示：手机端请使用 H.264 编码的 MP4 视频</div></div>
+        </div>
+
+        <div id="panel-vocab" class="panel-content">
+            <div id="vocab-panel">
+                <div style="display:flex; gap:8px; margin-bottom:10px;">
+                    <button class="act-btn" onclick="exportFile('txt')">TXT</button>
+                    <button class="act-btn" onclick="exportFile('csv')">Excel</button>
+                    <button class="act-btn" style="color:#e74c3c; border-color:#fadbd8; background:#fff5f5;" onclick="clearVocab()">清空</button>
+                </div>
+                <div id="vocab-list-container"></div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<div class="overlay-mask" id="modalMask"></div>
+<div id="add-word-modal">
+    <h4 style="margin:0 0 10px 0; color:#333;">添加生词</h4>
+    <div class="form-group"><input type="text" id="vocab-word" readonly style="background:#f5f5f5; font-weight:bold;"></div>
+    <div class="form-group"><input type="text" id="vocab-def" placeholder="输入释义..." autocomplete="off"></div>
+    <div class="form-group"><textarea id="vocab-eg" rows="3"></textarea></div>
+    <div class="modal-actions" style="margin-top:10px; display:flex; justify-content:flex-end; gap:10px;">
+        <button class="act-btn" onclick="closeModal()">取消</button>
+        <button class="act-btn active" onclick="saveVocab()">保存</button>
+    </div>
+</div>
+
+<script>
+    const state={subs:{source:[],target:[]},activeIndex:-1,loopMode:'none',loopA:null,loopB:null,overlayOn:false,manualSeek:false,vocab:[]};
+    function init(){try{const s=localStorage.getItem('shadow_vocab');if(s)state.vocab=JSON.parse(s);}catch(e){}updateVocabUI();document.addEventListener('copy',handleCopy);window.addEventListener('beforeunload',(e)=>{e.preventDefault();e.returnValue='';});}
+    
+    const video=document.getElementById('mainVideo');
+    const statusDiv=document.getElementById('video-status');
+    const playOverlay=document.getElementById('play-overlay');
+    const listDiv=document.getElementById('transcript-list');
+
+    // === 错误诊断与加载优化 ===
+    video.onerror = function() {
+        let msg = "未知错误";
+        if(video.error) {
+            switch(video.error.code) {
+                case 1: msg = "加载被中止"; break;
+                case 2: msg = "网络/解码错误"; break;
+                case 3: msg = "解码失败(格式不支持)"; break;
+                case 4: msg = "源文件不支持/无效"; break;
+            }
+        }
+        showStatus("❌ 无法播放: " + msg + "\n请尝试转换视频为 H.264 MP4", 5000);
+        // 如果出错，隐藏遮罩防止误导
+        playOverlay.style.display = 'none';
+    };
+
+    video.onloadedmetadata = function() {
+        showStatus("✅ 视频已就绪，请点击播放", 3000);
+        // 显示遮罩引导用户点击（因为手机不能自动播）
+        playOverlay.style.display = 'flex';
+    };
+
+    function showStatus(text, duration) {
+        statusDiv.innerText = text;
+        statusDiv.style.display = 'block';
+        if(duration) setTimeout(() => statusDiv.style.display = 'none', duration);
+    }
+
+    function triggerPlay() {
+        video.play().then(() => {
+            playOverlay.style.display = 'none';
+        }).catch(e => {
+            showStatus("播放失败: " + e.message, 3000);
+        });
+    }
+
+    function loadLocalVideo(input) {
+        const file = input.files[0];
+        if(!file) return;
+        
+        // 检查文件类型
+        if(file.type.indexOf('video') === -1 && !file.name.endsWith('.mp4')) {
+            alert("请选择视频文件");
+            return;
+        }
+
+        showStatus("正在加载视频...", 0);
+        const url = URL.createObjectURL(file);
+        video.src = url;
+        // 手机端关键：不要调用 video.play()，等待用户点击遮罩
+    }
+    
+    function loadSub(i,t){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=(e)=>{state.subs[t]=parseSRT(e.target.result);renderList();};r.readAsText(f);}
+    
+    // UI 逻辑
+    function switchTab(t){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel-content').forEach(x=>x.classList.remove('active'));if(t==='transcript'){document.getElementById('tab-transcript').classList.add('active');document.getElementById('panel-transcript').classList.add('active');}else{document.getElementById('tab-vocab').classList.add('active');document.getElementById('panel-vocab').classList.add('active');}}
+    function handleDisplayChange(){renderList();if(state.activeIndex!==-1)updateOverlay(state.activeIndex);}
+
+    function parseSRT(d){const i=[];const r=/(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})\n([\s\S]*?)(?=\n\n|\n$|$)/g;d=d.replace(/\r\n/g,'\n');let m;while((m=r.exec(d))!==null){i.push({start:timeToSec(m[1]),end:timeToSec(m[2]),text:m[3].trim()});}return i;}
+    function timeToSec(s){const p=s.split(':'),sec=p[2].split(',');return parseInt(p[0])*3600+parseInt(p[1])*60+parseInt(sec[0])+parseFloat(sec[1])/1000;}
+    function fmtTime(s){const m=Math.floor(s/60).toString().padStart(2,'0'),sec=Math.floor(s%60).toString().padStart(2,'0');return `${m}:${sec}`;}
+    function renderList(){const s=state.subs.source,t=state.subs.target,m=document.getElementById('displayMode').value;listDiv.innerHTML='';if(!s||!s.length){listDiv.innerHTML='<div style="padding:40px 20px; text-align:center; color:#999; font-size:13px;">请先加载字幕文件</div>';return;}s.forEach((it,i)=>{const mid=(it.start+it.end)/2,tt=t.find(x=>mid>=x.start&&mid<=x.end),txt=tt?tt.text:'',div=document.createElement('div');div.className='line';div.id=`line-${i}`;div.onclick=(e)=>{if(!window.getSelection().toString())jumpTo(i);};let h='';if(m==='source')h=`<div class="line-content">${it.text}</div>`;else if(m==='target')h=`<div class="line-content" style="color:#555">${txt||'(无)'}</div>`;else h=`<div class="line-content">${it.text}<div class="text-target">${txt}</div></div>`;div.innerHTML=`<span class="line-time">${fmtTime(it.start)}</span>${h}`;listDiv.appendChild(div);});}
+
+    function jumpTo(i){if(!state.subs.source[i])return;state.activeIndex=i;state.manualSeek=true;video.currentTime=state.subs.source[i].start+0.01;video.play();highlightLine(i);updateOverlay(i);playOverlay.style.display='none'; setTimeout(()=>state.manualSeek=false,600);}
+    function highlightLine(i){document.querySelectorAll('.line.active').forEach(x=>x.classList.remove('active'));const e=document.getElementById(`line-${i}`);if(e){e.classList.add('active');e.scrollIntoView({behavior:"smooth",block:"center"});}}
+    function findIdx(){const t=video.currentTime;return state.subs.source.findIndex(i=>t>=i.start&&t<i.end);}
+    function setLoopA(){const i=findIdx();state.loopA=(i!==-1)?state.subs.source[i].start:video.currentTime;state.loopMode='ab';updateLoopUI();}
+    function setLoopB(){if(state.loopA===null)state.loopA=0;const i=findIdx();state.loopB=(i!==-1)?state.subs.source[i].end:video.currentTime;if(state.loopB<state.loopA){if(i!==-1){state.loopA=state.subs.source[i].start;state.loopB=state.subs.source[i].end;}else{[state.loopA,state.loopB]=[state.loopB,state.loopA];}}state.loopMode='ab';video.currentTime=state.loopA;video.play();updateLoopUI();}
+    function clearLoop(){state.loopMode='none';state.loopA=null;state.loopB=null;updateLoopUI();}
+    function toggleSingleLoop(){state.loopMode=state.loopMode==='single'?'none':'single';if(state.loopMode==='single'&&state.activeIndex===-1)syncIdx();updateLoopUI();}
+    function updateLoopUI(){const a=document.getElementById('btnLoopA'),b=document.getElementById('btnLoopB'),c=document.getElementById('btnClearLoop'),s=document.getElementById('loopBtn');a.className='act-btn';b.className='act-btn';s.className='act-btn';c.style.display='none';if(state.loopMode==='ab'){if(state.loopA!==null)a.classList.add('loop-on');if(state.loopB!==null)b.classList.add('loop-on');c.style.display='inline-flex';}else if(state.loopMode==='single')s.classList.add('active');}
+
+    function handleCopy(){const sel=window.getSelection();if(!sel.toString().trim())return;setTimeout(()=>popupVocabModal(sel.toString().trim()),100);}
+    function popupVocabModal(t){let c="";if(state.activeIndex!==-1){const s=state.subs.source,p=s[state.activeIndex-1]?.text||"",cr=s[state.activeIndex].text,n=s[state.activeIndex+1]?.text||"";c=`${p} ${cr} ${n}`.trim();}document.getElementById('vocab-word').value=t;document.getElementById('vocab-def').value="";document.getElementById('vocab-eg').value=c;document.getElementById('modalMask').style.display='block';document.getElementById('add-word-modal').style.display='block';}
+    function closeModal(){document.getElementById('modalMask').style.display='none';document.getElementById('add-word-modal').style.display='none';}
+    function saveVocab(){const w=document.getElementById('vocab-word').value,d=document.getElementById('vocab-def').value,e=document.getElementById('vocab-eg').value;if(!w)return;state.vocab.unshift({word:w,def:d,eg:e,date:new Date().toLocaleDateString()});localStorage.setItem('shadow_vocab',JSON.stringify(state.vocab));updateVocabUI();closeModal();if(state.overlayOn)updateOverlay(state.activeIndex);}
+    function updateVocabUI(){document.getElementById('vocab-count').innerText=state.vocab.length;const c=document.getElementById('vocab-list-container');c.innerHTML='';state.vocab.forEach((v,i)=>{const d=document.createElement('div');d.className='vocab-item';d.innerHTML=`<div style="font-weight:bold;color:#333">${v.word}</div><div style="font-size:13px;color:#e67e22;margin:4px 0;">${v.def}</div><div style="font-size:12px;color:#888;background:#f9f9f9;padding:6px;border-radius:4px;">${v.eg}</div><button style="position:absolute;top:10px;right:10px;border:none;background:none;color:#e74c3c;font-size:16px;" onclick="delVocab(${i})">×</button>`;c.appendChild(d);});}
+    function delVocab(i){state.vocab.splice(i,1);localStorage.setItem('shadow_vocab',JSON.stringify(state.vocab));updateVocabUI();if(state.overlayOn)updateOverlay(state.activeIndex);}
+    function clearVocab(){if(confirm('清空?')){state.vocab=[];localStorage.setItem('shadow_vocab','[]');updateVocabUI();}}
+
+    function toggleOverlay(){state.overlayOn=!state.overlayOn;document.getElementById('video-overlay').style.display=state.overlayOn?'block':'none';const b=document.getElementById('overlayBtn');b.innerText=state.overlayOn?"关":"开";b.classList.toggle('active',state.overlayOn);if(state.overlayOn&&state.activeIndex!==-1)updateOverlay(state.activeIndex);}
+    function updateOverlay(i){if(!state.overlayOn)return;const s=state.subs.source[i],m=document.getElementById('displayMode').value,os=document.getElementById('overlay-s'),ot=document.getElementById('overlay-t');os.innerHTML="";ot.innerText="";if(s){if(m==='source'||m==='both')os.innerHTML=highlightText(s.text);if(m==='target'||m==='both'){const mid=(s.start+s.end)/2,t=state.subs.target.find(x=>mid>=x.start&&mid<=x.end);if(t)ot.innerText=t.text;}}}
+    function highlightText(t){if(!t)return"";let r=t;state.vocab.map(v=>v.word).sort((a,b)=>b.length-a.length).forEach(w=>{if(w)try{r=r.replace(new RegExp(`(${w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`,'gi'),'<span class="vocab-highlight">$1</span>');}catch(e){}});return r;}
+    
+    video.addEventListener('timeupdate',()=>{if(state.manualSeek)return;const t=video.currentTime,src=state.subs.source;if(!src||!src.length)return;if(state.loopMode==='ab'&&state.loopA!==null&&state.loopB!==null){if(t>=state.loopB){video.currentTime=state.loopA;video.play();return;}}if(state.loopMode==='single'&&state.activeIndex!==-1){if(t>src[state.activeIndex].end){video.currentTime=src[state.activeIndex].start;video.play();return;}}const idx=src.findIndex(i=>t>=i.start&&t<i.end);if(idx!==-1&&idx!==state.activeIndex){if(state.loopMode!=='single'){state.activeIndex=idx;highlightLine(idx);updateOverlay(idx);}}});
+    function syncIdx(){const t=video.currentTime,i=state.subs.source.findIndex(s=>t>=s.start&&t<=s.end);if(i!==-1)state.activeIndex=i;}
+    function changeSpeed(){video.playbackRate=parseFloat(document.getElementById('speedSelect').value);}
+    function nav(d){const n=state.activeIndex+d;if(n>=0&&n<state.subs.source.length)jumpTo(n);}
+    
+    function exportFile(type) {
+        if(!state.vocab.length){ alert("空"); return; }
+        let c="",mime="",ext="";
+        if(type==='txt'){ext=".txt";mime="text/plain";c="单词\t释义\t语境\n";state.vocab.forEach(v=>c+=`${v.word}\t${v.def}\t${v.eg}\n`);}
+        else if(type==='csv'){ext=".csv";mime="text/csv";c="\ufeff单词,释义,语境\n";state.vocab.forEach(v=>c+=`"${v.word}","${v.def}","${v.eg}"\n`);}
+        const blob=new Blob([c],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download="vocab"+ext;a.click();
+    }
+
+    init();
+</script>
+</body>
+</html>
